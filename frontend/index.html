@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Telegram 机器人管理系统<</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- 导航栏 -->
+      <nav class="navbar">
+        <div class="navbar-container">
+          <div class="navbar-title">
+            <h1>🤖 Telegram 机器人管理系统<</h1>
+          </div>
+          <div class="navbar-status">
+            <span
+              v-if="systemStatus.api_up"
+              class="status-badge status-running"
+            >
+              🟢 运行中
+            </span>
+            <span v-else class="status-badge status-stopped"> 🔴 已停止 </span>
+          </div>
+        </div>
+      </nav>
+
+      <!-- 主容器 -->
+      <div class="main-container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+          <div class="menu">
+            <div
+              class="menu-item"
+              :class="{active: activeTab === 'dashboard'}"
+              @click="activeTab = 'dashboard'"
+            >
+              📊 仪表板
+            </div>
+            <div
+              class="menu-item"
+              :class="{active: activeTab === 'accounts'}"
+              @click="activeTab = 'accounts'"
+            >
+              👤 账号管理
+            </div>
+            <div
+              class="menu-item"
+              :class="{active: activeTab === 'config'}"
+              @click="activeTab = 'config'"
+            >
+              ⚙️ 配置设置
+            </div>
+            <div
+              class="menu-item"
+              :class="{active: activeTab === 'logs'}"
+              @click="activeTab = 'logs'"
+            >
+              📋 日志监控
+            </div>
+            <div
+              class="menu-item"
+              :class="{active: activeTab === 'stats'}"
+              @click="activeTab = 'stats'"
+            >
+              📈 数据统计
+            </div>
+          </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="content">
+          <!-- 仪表板 -->
+          <section v-if="activeTab === 'dashboard'" class="dashboard">
+            <div class="section-title">
+              <h2>📊 系统仪表板</h2>
+              <button @click="refreshStatus" class="btn-refresh">刷新</button>
+            </div>
+
+            <div class="dashboard-grid">
+              <!-- 状态卡片 -->
+              <div class="card">
+                <h3>系统状态</h3>
+                <div class="status-info">
+                  <span v-if="systemStatus.api_up" class="badge-green"
+                    >运行中</span
+                  >
+                  <span v-else class="badge-red">已停止</span>
+                </div>
+              </div>
+
+              <!-- 监控号卡片（仪表板仅展示，不提供操作） -->
+              <div class="card">
+                <h3>监控号状态</h3>
+                <div class="account-info">
+                  <div v-if="systemStatus.monitor">
+                    <p>电话: {{ systemStatus.monitor.phone_number }}</p>
+                    <p>ID: {{ systemStatus.monitor.user_id }}</p>
+                    <p>
+                      状态:
+                      <span
+                        v-if="systemStatus.monitor.is_active"
+                        class="badge-green"
+                        >活跃</span
+                      ><span v-else class="badge-red">离线</span>
+                    </p>
+                  </div>
+                  <div v-else>
+                    <p
+                      v-if="systemStatus.monitor_session_exists"
+                      class="badge-info"
+                    >
+                      检测到本地监控会话文件 (monitor.session)
+                    </p>
+                    <p v-else class="badge-red">监控号未登录</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 克隆号统计 -->
+              <div class="card">
+                <h3>克隆号统计</h3>
+                <div class="stat-number">
+                  {{ systemStatus.senders ? systemStatus.senders.length : 0 }}
+                </div>
+                <p>个活跃克隆号</p>
+              </div>
+
+              <!-- 消息队列 -->
+              <div class="card">
+                <h3>消息队列</h3>
+                <div class="stat-number">
+                  {{ systemStatus.queue_size || 0 }}
+                </div>
+                <p>条待处理消息</p>
+              </div>
+
+              <!-- 额外状态卡片（显示脚本运行相关） -->
+              <div class="card">
+                <h3>脚本服务</h3>
+                <div class="status-info">
+                  <span v-if="systemStatus.script_running" class="badge-green"
+                    >运行中</span
+                  >
+                  <span v-else class="badge-red">已停止</span>
+                </div>
+              </div>
+
+              <div class="card">
+                <h3>监听任务</h3>
+                <div class="status-info">
+                  <span v-if="systemStatus.script_running" class="badge-green"
+                    >运行中</span
+                  >
+                  <span v-else class="badge-red">已停止</span>
+                </div>
+              </div>
+
+              <div class="card">
+                <h3>脚本就绪</h3>
+                <div class="status-info">
+                  <span
+                    v-if="systemStatus.senders && systemStatus.senders.length > 0"
+                    class="badge-green"
+                    >活跃克隆号</span
+                  >
+                  <span v-else class="badge-red">无活跃克隆号</span>
+                </div>
+              </div>
+            </div>
+
+          </section>
+
+          <!-- 账号管理 -->
+          <section v-if="activeTab === 'accounts'" class="accounts">
+            <div class="section-title">
+              <h2>👤 账号管理</h2>
+            </div>
+
+            <!-- 监控号管理（表格样式） -->
+            <div class="card">
+              <h3>📡 监控号</h3>
+              <div class="senders-list">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>会话名</th>
+                      <th>头像</th>
+                      <th>用户名</th>
+                      <th>昵称</th>
+                      <th>监控群</th>
+                      <th>警告群</th>
+                      <th>是否在监听</th>
+                      <th>源群状态</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="systemStatus.monitor" key="monitor">
+                      <td>monitor</td>
+                      <td>
+                        <img
+                          class="avatar-thumb"
+                          :src="getMonitorAvatarUrl()"
+                          @error="onAvatarError"
+                          alt="avatar"
+                        />
+                      </td>
+                      <td>{{ systemStatus.monitor.username || "-" }}</td>
+                      <td>{{ systemStatus.monitor.display_name || "-" }}</td>
+                      <td>{{ sourceGroupsText || "-" }}</td>
+                      <td>{{ config.telegram.alert_group || "-" }}</td>
+                      <td>
+                        <span
+                          v-if="systemStatus.monitor.listening"
+                          class="badge-green"
+                          >监听中</span
+                        >
+                        <span v-else class="badge-red">未监听</span>
+                      </td>
+                      <td>
+                        <span
+                          v-if="systemStatus.monitor.source_groups_configured === false"
+                          class="badge-info"
+                          >未配置</span
+                        >
+                        <span
+                          v-else-if="systemStatus.monitor.source_groups_ok === true"
+                          class="badge-green"
+                          >正常</span
+                        >
+                        <span
+                          v-else-if="systemStatus.monitor.source_groups_ok === false"
+                          class="badge-red"
+                          >可能被踢 ({{
+                          (systemStatus.monitor.source_groups_missing ||
+                          []).length }})</span
+                        >
+                        <span v-else class="badge-info">未检测</span>
+                      </td>
+                      <td>
+                        <span
+                          v-if="systemStatus.monitor.is_active"
+                          class="badge-green"
+                          >活跃</span
+                        >
+                        <span v-else class="badge-red">离线</span>
+                      </td>
+                      <td class="action-cell">
+                        <button
+                          v-if="!systemStatus.monitor.is_active"
+                          @click="loginMonitor()"
+                          class="btn-small btn-success"
+                        >
+                          登录
+                        </button>
+                        <button
+                          v-else
+                          @click="logoutMonitor()"
+                          class="btn-small btn-danger"
+                        >
+                          离线
+                        </button>
+                        <button
+                          @click="updateMonitorProfileManual()"
+                          class="btn-small btn-primary"
+                        >
+                          手动资料
+                        </button>
+                        <button
+                          @click="refreshMonitorStatus(false)"
+                          class="btn-small btn-secondary"
+                        >
+                          刷新
+                        </button>
+                      </td>
+                    </tr>
+                    <tr v-else-if="systemStatus.monitor_session_exists">
+                      <td>monitor</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>{{ sourceGroupsText || "-" }}</td>
+                      <td>{{ config.telegram.alert_group || "-" }}</td>
+                      <td><span class="badge-red">未监听</span></td>
+                      <td><span class="badge-info">未检测</span></td>
+                      <td>
+                        <span class="badge-info">检测到本地会话文件</span>
+                      </td>
+                      <td>
+                        <button
+                          @click="loginMonitor()"
+                          class="btn-small btn-success"
+                        >
+                          登录
+                        </button>
+                        <button
+                          @click="refreshMonitorStatus(false)"
+                          class="btn-small btn-secondary"
+                          style="margin-left: 6px"
+                        >
+                          刷新
+                        </button>
+                      </td>
+                    </tr>
+                    <tr v-else>
+                      <td colspan="10">监控号未登录</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div
+                  style="
+                    margin-top: 8px;
+                    display: flex;
+                    gap: 8px;
+                    justify-content: flex-start;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <button
+                    @click="joinMonitorSourceGroups()"
+                    class="btn btn-secondary btn-bule"
+                  >
+                    加入监控源群
+                  </button>
+                  <button
+                    @click="joinMonitorAlertGroup()"
+                    class="btn btn-secondary btn-bule"
+                  >
+                    加入监控告警群
+                  </button>
+                  <button
+                    @click="startMonitorListening()"
+                    :class="['btn', 'btn-success', {disabled: monitorListening}]"
+                  >
+                    开始监听
+                  </button>
+                  <button
+                    @click="stopMonitorListening()"
+                    :class="['btn', 'btn-danger', {disabled: !monitorListening}]"
+                  >
+                    停止监听
+                  </button>
+                  <button
+                    @click="triggerMonitorUpload"
+                    class="btn btn-primary btn-bule push-right"
+                  >
+                    上传监控号
+                  </button>
+                  <input
+                    ref="monitorUploadInput"
+                    type="file"
+                    accept=".session"
+                    style="display: none"
+                    @change="uploadMonitorSessions"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 克隆号管理 -->
+            <div class="card">
+              <h3>🎭 克隆号</h3>
+              <!-- 批量操作 -->
+              <div class="button-group">
+                <button @click="loginAllSenders" class="btn btn-success">
+                  登录所有克隆号
+                </button>
+                <button @click="logoutAllSenders" class="btn btn-danger">
+                  离线所有克隆号
+                </button>
+                <button @click="refreshSendersList" class="btn btn-secondary">
+                  刷新克隆号列表
+                </button>
+                <button
+                  @click="triggerSenderUpload"
+                  class="btn btn-primary btn-bule push-right"
+                >
+                  批量上传克隆号
+                </button>
+                <input
+                  ref="senderUploadInput"
+                  type="file"
+                  multiple
+                  accept=".session,.session-journal"
+                  style="display: none"
+                  @change="uploadSenderSessions"
+                />
+              </div>
+
+              <div
+                v-if="allSessions && allSessions.length > 0"
+                class="senders-list"
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 8px;
+                  "
+                ></div>
+
+                <table>
+                  <thead>
+                    <tr>
+                      <th>会话名</th>
+                      <th>头像</th>
+                      <th>用户名</th>
+                      <th>昵称</th>
+                      <th>目标群状态</th>
+                      <th>是否在工作</th>
+
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="sender in allSessions"
+                      :key="sender.session_name"
+                    >
+                      <td>{{ sender.session_name }}</td>
+                      <td>
+                        <img
+                          class="avatar-thumb"
+                          :src="getSenderAvatarUrl(sender.session_name)"
+                          @error="onAvatarError"
+                          alt="avatar"
+                        />
+                      </td>
+                      <td>{{ sender.username || "-" }}</td>
+                      <td>{{ sender.display_name || "-" }}</td>
+                      <td>
+                        <span
+                          v-if="sender.target_groups_configured === false"
+                          class="badge-info"
+                          >未配置</span
+                        >
+                        <span
+                          v-else-if="sender.target_groups_ok === true"
+                          class="badge-green"
+                          >正常</span
+                        >
+                        <span
+                          v-else-if="sender.target_groups_ok === false"
+                          class="badge-red"
+                          >可能被踢 ({{ (sender.target_groups_missing ||
+                          []).length }})</span
+                        >
+                        <span v-else class="badge-info">未检测</span>
+                      </td>
+                      <td>
+                        <span v-if="sender.is_working" class="badge-green"
+                          >是</span
+                        >
+                        <span v-else class="badge-red">待工作</span>
+                      </td>
+
+                      <td>
+                        <span v-if="sender.is_active" class="badge-green"
+                          >活跃</span
+                        >
+                        <span v-else class="badge-red">离线</span>
+                      </td>
+                      <td class="action-cell">
+                        <button
+                          v-if="!sender.is_active"
+                          @click="loginSender(sender.session_name)"
+                          class="btn-small btn-success"
+                        >
+                          登录
+                        </button>
+                        <button
+                          v-else
+                          @click="logoutSender(sender.session_name)"
+                          class="btn-small btn-danger"
+                        >
+                          离线
+                        </button>
+                        <button
+                          @click="updateSenderProfile(sender.session_name)"
+                          class="btn-small btn-warning"
+                        >
+                          随机资料
+                        </button>
+                        <button
+                          @click="updateSenderNicknameManual(sender.session_name)"
+                          class="btn-small btn-primary"
+                        >
+                          手动资料
+                        </button>
+                        <button
+                          @click="refreshSender(sender.session_name)"
+                          class="btn-small btn-secondary"
+                        >
+                          刷新
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-else class="empty-state">暂无会话文件或克隆号</div>
+            </div>
+          </section>
+
+          <!-- 配置设置 -->
+          <section v-if="activeTab === 'config'" class="config">
+            <div class="section-title">
+              <h2>⚙️ 配置设置</h2>
+            </div>
+
+            <!-- Telegram 配置 -->
+            <div class="card">
+              <h3>Telegram 配置</h3>
+              <div class="form-group">
+                <label>警告群:</label>
+                <input
+                  v-model="config.telegram.alert_group"
+                  type="text"
+                  class="input"
+                />
+              </div>
+              <div class="form-group">
+                <label>目标群(逗号分隔):</label>
+                <input
+                  v-model="myGroupsInput"
+                  type="text"
+                  class="input"
+                  placeholder="@group1, @group2"
+                />
+              </div>
+              <div class="form-group">
+                <label>源群 (逗号分隔):</label>
+                <input v-model="sourceGroupsInput" type="text" class="input" />
+              </div>
+              <button @click="updateTelegramConfig" class="btn btn-success">
+                保存 Telegram 配置
+              </button>
+            </div>
+
+            <!-- 代理配置 -->
+            <div class="card">
+              <h3>代理配置</h3>
+              <div class="form-group">
+                <label>
+                  <input v-model="config.proxy.use_proxy" type="checkbox" />
+                  使用代理
+                </label>
+              </div>
+              <div v-if="config.proxy.use_proxy" class="form-group">
+                <label>代理地址:</label>
+                <input
+                  v-model="config.proxy.proxy_host"
+                  type="text"
+                  class="input"
+                />
+                <label>代理端口:</label>
+                <input
+                  v-model.number="config.proxy.proxy_port"
+                  type="number"
+                  class="input"
+                />
+                <label>代理用户名:</label>
+                <input
+                  v-model="config.proxy.proxy_username"
+                  type="text"
+                  class="input"
+                />
+                <label>代理密码:</label>
+                <input
+                  v-model="config.proxy.proxy_password"
+                  type="password"
+                  class="input"
+                />
+              </div>
+              <button @click="updateProxyConfig" class="btn btn-success">
+                保存代理配置
+              </button>
+            </div>
+
+            <!-- 过滤配置 -->
+            <div class="card">
+              <h3>过滤配置</h3>
+              <div class="form-group">
+                <label>过滤关键词 (逗号分隔):</label>
+                <textarea
+                  v-model="filterKeywordsInput"
+                  class="textarea"
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label>最大文件大小 (MB):</label>
+                <input
+                  v-model.number="config.filter.max_file_size_mb"
+                  type="number"
+                  class="input"
+                />
+              </div>
+              <button @click="updateFilterConfig" class="btn btn-success">
+                保存过滤配置
+              </button>
+            </div>
+
+            <!-- 系统配置 -->
+            <div class="card">
+              <h3>系统配置</h3>
+              <div class="form-group">
+                <label>最大并发任务数:</label>
+                <input
+                  v-model.number="config.system.max_concurrent_tasks"
+                  type="number"
+                  class="input"
+                />
+              </div>
+              <div class="form-group">
+                <label>消息队列大小:</label>
+                <input
+                  v-model.number="config.system.msg_queue_size"
+                  type="number"
+                  class="input"
+                />
+              </div>
+              <button @click="updateSystemConfig" class="btn btn-success">
+                保存系统配置
+              </button>
+            </div>
+          </section>
+
+          <!-- 日志监控 -->
+          <section v-if="activeTab === 'logs'" class="logs">
+            <div class="section-title">
+              <h2>📋 日志监控</h2>
+              <button @click="refreshLogs" class="btn-refresh">刷新</button>
+            </div>
+
+            <div class="card">
+              <div class="log-filter">
+                <select v-model="logFilter" class="select">
+                  <option value="">所有日志</option>
+                  <option value="INFO">信息</option>
+                  <option value="WARNING">警告</option>
+                  <option value="ERROR">错误</option>
+                </select>
+              </div>
+
+              <div class="log-container">
+                <div
+                  v-for="(log, index) in filteredLogs"
+                  :key="index"
+                  :class="['log-entry', 'log-' + log.level.toLowerCase()]"
+                >
+                  <!-- <span class="log-time">{{ formatTime(log.timestamp) }}</span>
+                  <span class="log-level">{{ log.level }}</span> -->
+                  <span class="log-message">{{ log.message }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 数据统计 -->
+          <section v-if="activeTab === 'stats'" class="stats">
+            <div class="section-title">
+              <h2>📈 数据统计</h2>
+            </div>
+
+            <div class="card">
+              <h3>最近 7 天统计</h3>
+              <div class="stat-grid">
+                <div class="stat-item">
+                  <div class="stat-value">{{ stats.total_messages }}</div>
+                  <div class="stat-label">总转发消息数</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ stats.total_senders }}</div>
+                  <div class="stat-label">活跃克隆号数</div>
+                </div>
+              </div>
+
+              <h3>克隆号消息统计</h3>
+              <table
+                class="excel-table"
+                v-if="stats.stats && stats.stats.length > 0"
+              >
+                <thead>
+                  <tr>
+                    <th>克隆号</th>
+                    <th>目标群</th>
+                    <th>消息数</th>
+                    <th>日期</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(stat, index) in stats.stats" :key="index">
+                    <td>{{ stat.sender_name }}</td>
+                    <td>{{ stat.target_group }}</td>
+                    <td>{{ stat.message_count }}</td>
+                    <td>{{ stat.created_date }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-else class="empty-state">暂无统计数据</div>
+            </div>
+          </section>
+        </main>
+      </div>
+      <div
+        v-if="nicknameDialog.visible"
+        class="modal-overlay"
+        @click.self="closeNicknameDialog"
+      >
+        <div class="modal">
+          <div class="modal-header">手动修改昵称</div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>会话名</label>
+              <div class="modal-text">{{ nicknameDialog.sessionName }}</div>
+            </div>
+            <div class="form-group">
+              <label>昵称</label>
+              <input
+                v-model="nicknameDialog.nickname"
+                type="text"
+                class="input"
+                placeholder="输入新昵称"
+              />
+            </div>
+            <div class="form-group">
+              <label> 头像文件 </label>
+              <input
+                type="file"
+                accept="image/*"
+                class="input"
+                @change="onNicknamePhotoChange"
+              />
+              <div class="modal-text" v-if="nicknameDialog.photoName">
+                已选择：{{ nicknameDialog.photoName }}
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button @click="closeNicknameDialog" class="btn btn-secondary">
+              取消
+            </button>
+            <button
+              @click="submitNicknameDialog"
+              :class="['btn', 'btn-success', {disabled: nicknameDialog.submitting}]"
+            >
+              确定
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

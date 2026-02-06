@@ -1,0 +1,10 @@
+('C:\\Users\\Administrator\\Desktop\\nonitor\\炒群脚本1.0原始版本\\monitor',
+ 'monitor',
+ [],
+ 'DATA',
+ [('monitor\\12177662808.session',
+   'C:\\Users\\Administrator\\Desktop\\nonitor\\炒群脚本1.0原始版本\\monitor\\12177662808.session',
+   'DATA'),
+  ('monitor\\monitor.session',
+   'C:\\Users\\Administrator\\Desktop\\nonitor\\炒群脚本1.0原始版本\\monitor\\monitor.session',
+   'DATA')])

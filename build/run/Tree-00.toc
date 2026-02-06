@@ -1,0 +1,13 @@
+('C:\\Users\\Administrator\\Desktop\\nonitor\\炒群脚本1.0原始版本\\frontend',
+ 'frontend',
+ [],
+ 'DATA',
+ [('frontend\\index.html',
+   'C:\\Users\\Administrator\\Desktop\\nonitor\\炒群脚本1.0原始版本\\frontend\\index.html',
+   'DATA'),
+  ('frontend\\assets\\app.js',
+   'C:\\Users\\Administrator\\Desktop\\nonitor\\炒群脚本1.0原始版本\\frontend\\assets\\app.js',
+   'DATA'),
+  ('frontend\\assets\\style.css',
+   'C:\\Users\\Administrator\\Desktop\\nonitor\\炒群脚本1.0原始版本\\frontend\\assets\\style.css',
+   'DATA')])

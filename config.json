@@ -1,0 +1,41 @@
+{
+  "telegram": {
+    "monitor_account_id": 6,
+    "monitor_api_hash": "eb06d4ab352772397adad09530d31d5d",
+    "shared_api_id": 6,
+    "shared_api_hash": "eb06d4ab352772397adad09530d31d5d",
+    "alert_group": "@fasfwe22",
+    "source_groups": [
+      "@afasf11"
+    ],
+    "my_groups": [
+      "@fasfwe22"
+    ]
+  },
+  "proxy": {
+    "use_proxy": true,
+    "proxy_type": "SOCKS5",
+    "proxy_host": "127.0.0.1",
+    "proxy_port": 7897,
+    "proxy_username": "",
+    "proxy_password": ""
+  },
+  "filter": {
+    "keywords": [
+      "广告",
+      "加粉",
+      "联系方式",
+      "私聊",
+      "vx",
+      "私信"
+    ],
+    "max_file_size_mb": 10
+  },
+  "system": {
+    "max_concurrent_tasks": 3,
+    "msg_queue_size": 500,
+    "auto_check_interval": 30,
+    "check_status_interval": 30,
+    "login_timeout_sec": 30
+  }
+}

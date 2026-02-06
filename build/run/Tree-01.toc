@@ -1,0 +1,5 @@
+('C:\\Users\\Administrator\\Desktop\\nonitor\\炒群脚本1.0原始版本\\configs',
+ 'configs',
+ [],
+ 'DATA',
+ [])
