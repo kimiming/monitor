@@ -1,0 +1,27 @@
+# Runtime data
+/data/
+/logs/
+/sessions/
+/monitor/
+/profile_photos/
+/temp_media/
+/configs/
+
+# Local config and database
+/config.json
+/*.db
+/*.db-journal
+/*.sqlite
+/*.sqlite3
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+/.venv/
+/venv/
+
+# OS/editor files
+.DS_Store
+Thumbs.db

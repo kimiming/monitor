@@ -4,6 +4,7 @@
 import os
 import glob
 import asyncio
+import sqlite3
 from typing import Dict, List, Optional
 from telethon import TelegramClient, errors, functions
 from .config_manager import config_manager
@@ -18,7 +19,26 @@ class AccountManager:
         self.monitor_client = None
         self.sender_clients: Dict[str, TelegramClient] = {}
         self.is_running = False
-    
+
+    def _log_session_info(self, session_path: str):
+        """Log the SQLite session schema before Telethon opens it."""
+        actual_path = session_path if session_path.endswith('.session') else f"{session_path}.session"
+        if not os.path.exists(actual_path):
+            logger.warning(f"⚠️ [Session诊断]：文件不存在 {actual_path}")
+            return
+        try:
+            size = os.path.getsize(actual_path)
+            with sqlite3.connect(actual_path) as conn:
+                tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+                columns = []
+                if 'sessions' in tables:
+                    columns = [row[1] for row in conn.execute("PRAGMA table_info(sessions)")]
+            logger.info(
+                f"📄 [Session诊断]：path={actual_path}, size={size}, tables={tables}, sessions_columns={columns}"
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ [Session诊断失败]：{actual_path} - {e}")
+
     def _get_proxy_config(self):
         """获取代理配置
         
@@ -74,6 +94,8 @@ class AccountManager:
             else:
                 # Fall back to creating a default session file.
                 session_path = os.path.join(session_dir, 'monitor.session')
+
+            self._log_session_info(session_path)
 
             self.monitor_client = TelegramClient(
                 session_path,
@@ -137,7 +159,7 @@ class AccountManager:
             self.monitor_client = None
             return False
         except Exception as e:
-            logger.error(f"❌ [监控号登录失败]：{e}")
+            logger.exception(f"❌ [监控号登录失败]：{e}")
             try:
                 db_manager.record_login_failure('monitor', str(e))
             except Exception:
@@ -213,6 +235,8 @@ class AccountManager:
             cfg = config_manager.telegram_config
             proxy = self._get_proxy_config()
             
+            self._log_session_info(session_path)
+
             client = TelegramClient(
                 session_path,
                 cfg.shared_api_id,
@@ -279,7 +303,7 @@ class AccountManager:
                 del self.sender_clients[session_name]
             return False
         except Exception as e:
-            logger.error(f"❌ [克隆号登录失败]：{session_name} - {e}")
+            logger.exception(f"❌ [克隆号登录失败]：{session_name} - {e}")
             try:
                 db_manager.record_login_failure(session_name, str(e))
             except Exception:
@@ -520,4 +544,5 @@ class AccountManager:
 
 # 全局账号管理器实例
 account_manager = AccountManager()
+
 
