@@ -11,7 +11,7 @@ class DBManager:
     """数据库管理器"""
     
     def __init__(self, db_file: str = 'personality_recycle.db'):
-        self.db_file = db_file
+        self.db_file = os.getenv('DB_FILE', db_file)
         self.lock = Lock()
         self.init_db()
     

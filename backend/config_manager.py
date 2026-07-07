@@ -64,14 +64,14 @@ class ConfigManager:
     """配置管理器"""
     
     def __init__(self, config_file: str = 'config.json'):
-        self.config_file = config_file
+        self.config_file = os.getenv('CONFIG_FILE', config_file)
         self.telegram_config = TelegramConfig()
         self.proxy_config = ProxyConfig()
         self.filter_config = FilterConfig()
         self.system_config = SystemConfig()
         
         # 加载现有配置
-        if os.path.exists(config_file):
+        if os.path.exists(self.config_file):
             self.load_config()
         else:
             self.save_config()
@@ -117,6 +117,10 @@ class ConfigManager:
     def save_config(self):
         """保存配置到文件"""
         try:
+            config_dir = os.path.dirname(self.config_file)
+            if config_dir:
+                os.makedirs(config_dir, exist_ok=True)
+
             config_data = {
                 'telegram': asdict(self.telegram_config),
                 'proxy': asdict(self.proxy_config),

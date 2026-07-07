@@ -7,7 +7,7 @@ import random
 import re
 import shutil
 import time
-from typing import Optional
+from typing import List, Optional
 from .config_manager import config_manager
 from .db_manager import db_manager
 from .logger_manager import logger

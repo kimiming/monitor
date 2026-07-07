@@ -1,0 +1,22 @@
+services:
+  telegram-bot:
+    build: .
+    container_name: telegram-bot
+    ports:
+      - "5000:5000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TZ: Asia/Shanghai
+      CONFIG_FILE: /app/data/config.json
+      DB_FILE: /app/data/personality_recycle.db
+    volumes:
+      - ./data:/app/data
+      - ./sessions:/app/sessions
+      - ./monitor:/app/monitor
+      - ./logs:/app/logs
+      - ./profile_photos:/app/profile_photos
+      - ./temp_media:/app/temp_media
+      - ./configs:/app/configs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

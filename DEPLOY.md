@@ -1,3 +1,7 @@
+# Deployment Notes
+
+For Ubuntu Docker deployment, use `DOCKER.md`. It contains the current Dockerfile, Compose, volume, proxy, and backup instructions for this project.
+
 # 📦 部署指南
 
 本指南介绍如何在不同环境下部署 Telegram 机器人管理系统。
