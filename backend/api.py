@@ -714,6 +714,68 @@ async def create_sender(session_name):
         return {'error': str(e)}, 500
 
 
+
+@app.route('/api/senders/delete/<session_name>', methods=['DELETE', 'POST'])
+def delete_sender(session_name):
+    """Delete one sender session and clear related runtime/database state."""
+    try:
+        original_name = (session_name or '').strip()
+        safe_name = secure_filename(original_name)
+        if not safe_name or safe_name != original_name:
+            return {'error': 'Invalid session name'}, 400
+        if safe_name == 'monitor':
+            return {'error': 'Refusing to delete monitor from sender list'}, 400
+
+        loop = _get_background_loop()
+        try:
+            future = asyncio.run_coroutine_threadsafe(account_manager.logout_sender(safe_name), loop)
+            future.result(timeout=10)
+        except Exception:
+            try:
+                if safe_name in account_manager.sender_clients:
+                    del account_manager.sender_clients[safe_name]
+            except Exception:
+                pass
+
+        sess_dir = os.path.abspath(os.path.join(os.getcwd(), 'sessions'))
+        removed_files = []
+        for suffix in ('.session', '.session-journal'):
+            file_path = os.path.abspath(os.path.join(sess_dir, f'{safe_name}{suffix}'))
+            if not file_path.startswith(sess_dir + os.sep):
+                continue
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                removed_files.append(os.path.basename(file_path))
+
+        try:
+            db_manager.remove_account_status(safe_name)
+        except Exception:
+            pass
+        try:
+            db_manager.clear_login_failure(safe_name)
+        except Exception:
+            pass
+        try:
+            conn = db_manager._get_connection()
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM user_mapping WHERE assigned_sender_name=?', (safe_name,))
+            cursor.execute('DELETE FROM username_mapping WHERE assigned_sender_name=?', (safe_name,))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger_manager.warning(f'Failed to clear mappings for {safe_name}: {e}')
+
+        logger_manager.info(f'[Sender delete] {safe_name}, removed files: {removed_files}')
+        return jsonify({
+            'message': f'{safe_name} deleted',
+            'session_name': safe_name,
+            'removed_files': removed_files
+        })
+    except Exception as e:
+        logger_manager.error(f'Delete sender failed: {e}')
+        return {'error': str(e)}, 500
+
+
 @app.route('/api/senders/login/<session_name>', methods=['POST'])
 @run_async
 async def login_sender(session_name):
@@ -1095,7 +1157,25 @@ async def refresh_senders_status():
         check_groups = str(request.args.get('check', '')).lower() in ('1', 'true', 'yes')
         status = await account_manager.refresh_senders_status()
 
-        senders = [s for s in status if s.get('session_name') != 'monitor']
+        sess_dir = os.path.join(os.getcwd(), 'sessions')
+        existing_sessions = set()
+        if os.path.isdir(sess_dir):
+            existing_sessions = {
+                fname[:-8]
+                for fname in os.listdir(sess_dir)
+                if fname.endswith('.session')
+            }
+        for s in status:
+            name = s.get('session_name')
+            if name and name != 'monitor' and name not in existing_sessions:
+                try:
+                    db_manager.remove_account_status(name)
+                except Exception:
+                    pass
+        senders = [
+            s for s in status
+            if s.get('session_name') != 'monitor' and s.get('session_name') in existing_sessions
+        ]
         if check_groups:
             # 逐个检查克隆号是否在目标群
             for sender in senders:

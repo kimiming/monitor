@@ -463,9 +463,10 @@
 
                       <td>
                         <span v-if="sender.is_active" class="badge-green"
-                          >活跃</span
+                          >Active</span
                         >
-                        <span v-else class="badge-red">离线</span>
+                        <span v-else-if="!sender.has_local_file" class="badge-red">Missing file</span>
+                        <span v-else class="badge-red">Offline</span>
                       </td>
                       <td class="action-cell">
                         <button
@@ -499,6 +500,12 @@
                           class="btn-small btn-secondary"
                         >
                           刷新
+                        </button>
+                        <button
+                          @click="deleteSender(sender.session_name)"
+                          class="btn-small btn-danger"
+                        >
+                          Delete
                         </button>
                       </td>
                     </tr>

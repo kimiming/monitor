@@ -64,11 +64,18 @@ const app = createApp({
         activeMap[s.session_name] = s;
       });
 
-      // 优先按照 localSessions 的顺序展示
       let workingUsed = 0;
       const workingLimit = this.workingCount;
-      return this.localSessions.map((name) => {
+      const names = [...this.localSessions];
+      (this.systemStatus.senders || []).forEach((s) => {
+        if (s.session_name && !names.includes(s.session_name)) {
+          names.push(s.session_name);
+        }
+      });
+
+      return names.map((name) => {
         const active = activeMap[name];
+        const hasLocalFile = this.localSessions.includes(name);
         const isActive = active ? active.is_active : false;
         const isWorking =
           this.systemStatus.worker_running &&
@@ -79,6 +86,7 @@ const app = createApp({
         }
         return {
           session_name: name,
+          has_local_file: hasLocalFile,
           username: active ? active.username : "",
           display_name: active ? active.display_name : "",
           phone_number: active ? active.phone_number : "",
@@ -118,7 +126,7 @@ const app = createApp({
     // API 调用方法
     async apiCall(method, endpoint, data = null) {
       try {
-        const url = `http://localhost:5000${endpoint}`;
+        const url = endpoint;
         const config = {
           method: method,
           headers: {
@@ -262,7 +270,7 @@ const app = createApp({
           formData.append("files", f);
         }
 
-        const url = "http://localhost:5000/api/monitor/upload-sessions";
+        const url = "/api/monitor/upload-sessions";
         const response = await axios.post(url, formData, {
           timeout: 120000,
         });
@@ -304,7 +312,7 @@ const app = createApp({
           formData.append("files", f);
         }
 
-        const url = "http://localhost:5000/api/sessions/upload";
+        const url = "/api/sessions/upload";
         const response = await axios.post(url, formData, {
           timeout: 120000,
         });
@@ -454,8 +462,8 @@ const app = createApp({
 
         const url =
           this.nicknameDialog.targetType === "monitor"
-            ? "http://localhost:5000/api/monitor/update-profile-manual"
-            : `http://localhost:5000/api/senders/update-profile-manual/${this.nicknameDialog.sessionName}`;
+            ? "/api/monitor/update-profile-manual"
+            : `/api/senders/update-profile-manual/${this.nicknameDialog.sessionName}`;
         const response = await axios.post(url, formData, {
           timeout: 120000,
         });
@@ -478,14 +486,14 @@ const app = createApp({
 
     getSenderAvatarUrl(sessionName) {
       const ts = this.avatarCacheBuster || 0;
-      return `http://localhost:5000/api/senders/avatar/${encodeURIComponent(
+      return `/api/senders/avatar/${encodeURIComponent(
         sessionName,
       )}?t=${ts}`;
     },
 
     getMonitorAvatarUrl() {
       const ts = this.avatarCacheBuster || 0;
-      return `http://localhost:5000/api/monitor/avatar?t=${ts}`;
+      return `/api/monitor/avatar?t=${ts}`;
     },
 
     onAvatarError(event) {
@@ -752,6 +760,28 @@ const app = createApp({
       }
     },
 
+
+    async deleteSender(sessionName) {
+      try {
+        const ok = window.confirm(`Delete sender ${sessionName}? This will remove its session file and clear list records.`);
+        if (!ok) {
+          return;
+        }
+        const result = await this.apiCall(
+          "DELETE",
+          `/api/senders/delete/${encodeURIComponent(sessionName)}`,
+        );
+        this.showMessage(result.message || `${sessionName} deleted`, "success");
+        this.localSessions = this.localSessions.filter((name) => name !== sessionName);
+        this.systemStatus.senders = (this.systemStatus.senders || []).filter(
+          (s) => s.session_name !== sessionName,
+        );
+        await this.refreshSendersList();
+      } catch (error) {
+        console.error(`Delete ${sessionName} failed:`, error);
+      }
+    },
+
     // 日志相关
     async refreshLogs() {
       try {
@@ -830,7 +860,7 @@ const app = createApp({
       if (newTab === "config") {
         this.loadConfig();
       } else if (newTab === "accounts") {
-        this.loadSessionFiles();
+        this.refreshSendersList();
         this.refreshMonitorStatus(true);
       } else if (newTab === "logs") {
         this.refreshLogs();
@@ -844,7 +874,7 @@ const app = createApp({
     // 初始化
     this.refreshStatus();
     this.loadConfig();
-    this.loadSessionFiles();
+    this.refreshSendersList();
     if (this.activeTab === "accounts") {
       this.refreshMonitorStatus(true);
     }
