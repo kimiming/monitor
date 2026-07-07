@@ -5,6 +5,7 @@ import os
 import glob
 import asyncio
 import sqlite3
+import traceback
 from typing import Dict, List, Optional
 from telethon import TelegramClient, errors, functions
 from .config_manager import config_manager
@@ -38,6 +39,45 @@ class AccountManager:
             )
         except Exception as e:
             logger.warning(f"⚠️ [Session诊断失败]：{actual_path} - {e}")
+
+    def _normalize_session_schema(self, session_path: str):
+        """Make newer Telethon session files readable by the pinned Telethon version."""
+        actual_path = session_path if session_path.endswith('.session') else f"{session_path}.session"
+        if not os.path.exists(actual_path):
+            return
+
+        expected = ['dc_id', 'server_address', 'port', 'auth_key', 'takeout_id']
+        try:
+            with sqlite3.connect(actual_path) as conn:
+                tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+                if 'sessions' not in tables:
+                    return
+                columns = [row[1] for row in conn.execute("PRAGMA table_info(sessions)")]
+                if columns == expected:
+                    return
+                if not all(name in columns for name in expected):
+                    logger.warning(f"⚠️ [Session兼容]：sessions 表字段不兼容，跳过自动修复 {columns}")
+                    return
+
+                conn.execute("ALTER TABLE sessions RENAME TO sessions_old")
+                conn.execute(
+                    "CREATE TABLE sessions ("
+                    "dc_id integer primary key, "
+                    "server_address text, "
+                    "port integer, "
+                    "auth_key blob, "
+                    "takeout_id integer"
+                    ")"
+                )
+                conn.execute(
+                    "INSERT INTO sessions (dc_id, server_address, port, auth_key, takeout_id) "
+                    "SELECT dc_id, server_address, port, auth_key, takeout_id FROM sessions_old"
+                )
+                conn.execute("DROP TABLE sessions_old")
+                conn.commit()
+                logger.warning(f"⚠️ [Session兼容]：已移除额外字段 {actual_path}: {columns} -> {expected}")
+        except Exception as e:
+            logger.error(f"❌ [Session兼容失败]：{actual_path} - {e}\n{traceback.format_exc()}")
 
     def _get_proxy_config(self):
         """获取代理配置
@@ -95,6 +135,8 @@ class AccountManager:
                 # Fall back to creating a default session file.
                 session_path = os.path.join(session_dir, 'monitor.session')
 
+            self._log_session_info(session_path)
+            self._normalize_session_schema(session_path)
             self._log_session_info(session_path)
 
             self.monitor_client = TelegramClient(
@@ -159,7 +201,7 @@ class AccountManager:
             self.monitor_client = None
             return False
         except Exception as e:
-            logger.exception(f"❌ [监控号登录失败]：{e}")
+            logger.error(f"❌ [监控号登录失败]：{e}\n{traceback.format_exc()}")
             try:
                 db_manager.record_login_failure('monitor', str(e))
             except Exception:
@@ -236,6 +278,8 @@ class AccountManager:
             proxy = self._get_proxy_config()
             
             self._log_session_info(session_path)
+            self._normalize_session_schema(session_path)
+            self._log_session_info(session_path)
 
             client = TelegramClient(
                 session_path,
@@ -303,7 +347,7 @@ class AccountManager:
                 del self.sender_clients[session_name]
             return False
         except Exception as e:
-            logger.exception(f"❌ [克隆号登录失败]：{session_name} - {e}")
+            logger.error(f"❌ [克隆号登录失败]：{session_name} - {e}\n{traceback.format_exc()}")
             try:
                 db_manager.record_login_failure(session_name, str(e))
             except Exception:
@@ -544,5 +588,4 @@ class AccountManager:
 
 # 全局账号管理器实例
 account_manager = AccountManager()
-
 
