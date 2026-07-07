@@ -23,36 +23,27 @@ class AccountManager:
         """获取代理配置
         
         逻辑：
-        - use_proxy=False：尝试使用系统代理（Windows 系统代理、环境变量等）
+        - use_proxy=False：直连 Telegram
         - use_proxy=True：使用手动配置的代理
         """
         import socks
         cfg = config_manager.proxy_config
         
         if not cfg.use_proxy:
-            # use_proxy=False 时，自动尝试系统代理
-            # 检查环境变量中是否有代理配置
-            import os
-            http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
-            https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
-            
-            if http_proxy or https_proxy:
-                logger.info(f"✅ 使用系统代理：{http_proxy or https_proxy}")
-            
-            # 返回 None，让 Telethon 使用系统默认代理
+            logger.info("✅ 不使用代理，直连 Telegram")
             return None
         
-        # 手动配置的代理
         logger.info(f"✅ 使用手动配置代理：{cfg.proxy_host}:{cfg.proxy_port}")
-        return {
-            'proxy_type': socks.SOCKS5,
-            'addr': cfg.proxy_host,
-            'port': cfg.proxy_port,
-            'username': cfg.proxy_username if cfg.proxy_username else None,
-            'password': cfg.proxy_password if cfg.proxy_password else None,
-            'rdns': True
-        }
-    
+        proxy_type = socks.SOCKS5
+        if str(cfg.proxy_type).upper() in ("HTTP", "HTTP_PROXY"):
+            proxy_type = socks.HTTP
+        elif str(cfg.proxy_type).upper() in ("SOCKS4", "SOCKS4A"):
+            proxy_type = socks.SOCKS4
+
+        username = cfg.proxy_username or None
+        password = cfg.proxy_password or None
+        return (proxy_type, cfg.proxy_host, int(cfg.proxy_port), True, username, password)
+
     async def login_monitor(self) -> bool:
         """登录监控号"""
         try:
@@ -529,3 +520,4 @@ class AccountManager:
 
 # 全局账号管理器实例
 account_manager = AccountManager()
+
